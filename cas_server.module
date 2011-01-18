@@ -344,12 +344,9 @@ function cas_server_load_service_ticket($service_ticket) {
             if ($existingmappings) {
                 
                 foreach ($existingmappings as $key => $value) {
-                    $ticket->$value = $civicontact->$key;
+                    $ticket->$value = htmlspecialchars($civicontact->$key, ENT_NOQUOTES);
                 }
             }
-            // Add extra user details here as they are needed for external account creation
-            //$ticket->firstname = $civicontact->first_name;
-            //$ticket->lastname  = $civicontact->last_name;
         }
     }
 
