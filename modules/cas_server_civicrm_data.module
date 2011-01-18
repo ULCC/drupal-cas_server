@@ -1,0 +1,10 @@
+<?php
+/* 
+ * This module will allow data to be pulled from civicrm and added to the ticket returned so that it
+ * can be used to create accounts in the external systems e.g. Moodle, Mahara.
+ *
+ * It is empty as it really just acts as a placeholder to ensure that the feature is only enabled
+ * when the dependencies are met.
+ */
+
+?>

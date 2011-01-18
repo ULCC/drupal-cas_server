@@ -1,0 +1,11 @@
+; $Id: cas_server.info,v 1.1 2009/10/08 20:51:58 jtenman Exp $ 
+name = CAS Server
+description = Implement a CAS Server using Drupal as the user base. This allows transparent single sign on to other systems once signed into Drupal.
+package = CAS Server
+core = 6.x
+; Information added by drupal.org packaging script on 2010-07-11
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "cas_server"
+datestamp = "1278833643"
+
