@@ -339,9 +339,17 @@ function cas_server_load_service_ticket($service_ticket) {
             $civicrmcontactid = CRM_Core_BAO_UFMatch::getContactId( $ticket->uid );
             $civicontact = civicrm_cck_get_contact($civicrmcontactid);
 
+            $existingmappings = variable_get('cas_server_civicrm_map', null);
+
+            if ($existingmappings) {
+                
+                foreach ($existingmappings as $key => $value) {
+                    $ticket->$value = $civicontact->$key;
+                }
+            }
             // Add extra user details here as they are needed for external account creation
-            $ticket->firstname = $civicontact->first_name;
-            $ticket->lastname  = $civicontact->last_name;
+            //$ticket->firstname = $civicontact->first_name;
+            //$ticket->lastname  = $civicontact->last_name;
         }
     }
 
