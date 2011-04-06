@@ -17,64 +17,73 @@ function cas_server_admin_form() {
     '#description' => t('Select which of the options should be sent as the username to a service'),
     '#default_value' => variable_get('cas_server_username_value', 'name'),
     );
+    
+    // TODO We may want other Drupal data too.
+    $drupalUserFields = '';
+    
+    // Get all Drupal user data fields
+    
+    // Loop to make them appear int he form.
+    
+    
+    // Need to make sure we don't duplicate the Drupal stuff.
 
     // only ask what civicrm data to send over if civicrm is enabled.
     if (module_exists('cas_server_civicrm_data')) {
 
         // get all available CiviCRM contact fields
-        if ( ! civicrm_initialize( ) ) {
-            return;
-        }
+        if ( function_exists('civicrm_initialize') && civicrm_initialize( ) ) {
+          
 
-        include('CRM/Contact/BAO/Contact.php');
+            include('CRM/Contact/BAO/Contact.php');
 
-        $fields = CRM_Contact_BAO_CONTACT::exportableFields(); // Note: this returns a reference to an array
+            $fields = CRM_Contact_BAO_CONTACT::exportableFields(); // Note: this returns a reference to an array
 
-        if ($fields) {
+            if ($fields) {
 
-            $form['mappings'] = array(
-                '#type' => 'fieldset',
-                '#tree' => FALSE,
-            );
-
-            $form['mappings']['title'] = array(
-                '#type' => 'item',
-                '#title' => t('Data mappings from CiviCRM'),
-                '#description' => t('These are optional and will be sent along with the CAS ticket
-                    validation response so that the external system can create a new account with them
-                    if required.<br /><br />NOTE: email is automatically sent as \'mail\'')
-            );
-
-            $form['mappings']['cas_server_civicrm_map'] = array(
-                    '#tree' => TRUE
-            );
-
-            // loop through them, presenting a checkbox for each one and a name field so they can be mapped
-            // to whatever the external system wants
-
-            $existingmappings = variable_get('cas_server_civicrm_map', null);
-
-            foreach ($fields as $field) {
-
-                // skip any blank ones
-                if (empty($field['name'])) {
-                    continue;
-                }
-
-                //$setting = 'cas_server_civicrm_data_'.$field['name'].'_mapping';
-                $setting = $field['name'];
-
-                $form['mappings']['cas_server_civicrm_map'][$setting] = array(
-                        '#type' => 'textfield',
-                        '#title' => t($field['name']),
-                        '#description' => t('What should the CiviCRM "'.$field['name'].'" field be labelled as (empty = not sent)?'),
-                        '#default_value' => isset($existingmappings[$setting]) ? $existingmappings[$setting] : ''
+                $form['mappings'] = array(
+                    '#type' => 'fieldset',
+                    '#tree' => FALSE,
                 );
 
+                $form['mappings']['title'] = array(
+                    '#type' => 'item',
+                    '#title' => t('Data mappings from CiviCRM'),
+                    '#description' => t('These are optional and will be sent along with the CAS ticket
+                        validation response so that the external system can create a new account with them
+                        if required.<br /><br />NOTE: email is automatically sent as \'mail\'')
+                );
 
+                $form['mappings']['cas_server_civicrm_map'] = array(
+                        '#tree' => TRUE
+                );
+
+                // loop through them, presenting a checkbox for each one and a name field so they can be mapped
+                // to whatever the external system wants
+
+                $existingmappings = variable_get('cas_server_civicrm_map', null);
+
+                foreach ($fields as $field) {
+
+                    // skip any blank ones
+                    if (empty($field['name'])) {
+                        continue;
+                    }
+
+                    //$setting = 'cas_server_civicrm_data_'.$field['name'].'_mapping';
+                    $setting = $field['name'];
+
+                    $form['mappings']['cas_server_civicrm_map'][$setting] = array(
+                            '#type' => 'textfield',
+                            '#title' => t($field['name']),
+                            '#description' => t('What should the CiviCRM "'.$field['name'].'" field be labelled as (empty = not sent)?'),
+                            '#default_value' => isset($existingmappings[$setting]) ? $existingmappings[$setting] : ''
+                    );
+
+
+                }
             }
         }
-
   }
 
   // Add a submit handler that will make the settings for the mappings into an array

@@ -1,10 +1,10 @@
 name = CiviCRM Data
 description = Enables the export of data from CiviCRM contact record so that it is sent to the system authenticating through CAS, allowing a new account to be created in the external system. Only works when SAML authentication method is used.
 dependencies[] = cas_server
-dependencies[] = civicrm
-dependencies[] = civicrm_cck
+; dependencies[] = civicrm
+; dependencies[] = civicrm_cck
 package = CAS Server
-core = 6.x
+core = 7.x
 
 
 

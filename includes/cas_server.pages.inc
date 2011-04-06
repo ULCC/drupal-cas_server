@@ -8,14 +8,11 @@ function cas_server_login_page() {
   global $user;
   
   $service = urldecode($_GET['service']);
-  $renew   = $_GET['renew'];
-  $gateway = $_GET['gateway'];
+  $renew   = isset($_GET['renew']) ? $_GET['renew'] : false;
+  $gateway = isset($_GET['gateway']) ? $_GET['gateway'] : false;
   // if $warn is not set, use the session one if it's there.
-  $warn = $_GET['warn'] || (isset($_SESSION['cas']['warn']) ? $_SESSION['cas']['warn'] : false);
+  $warn = isset($_GET['warn']) || (isset($_SESSION['cas']['warn']) ? $_SESSION['cas']['warn'] : false);
 
-
-
-  
   return cas_server_login_request($service, $warn, $renew, $gateway);
 }
 
@@ -31,9 +28,18 @@ function cas_server_logout_page() {
     unset($_SESSION['cas']['current_tgc']);
     
     //On service logout we need invalidate all valid tickets
-    db_query('UPDATE {cas_server_service} SET current_valid_ticket = 0 WHERE uid = %d', $user->uid);
-    db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css SET cspg.current_valid_ticket = 0 WHERE css.uid = %d AND css.service_ticket_id=cspg.service_ticket_id', $user->uid);
-    db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css SET csp.current_valid_ticket = 0 WHERE css.uid = %d AND css.service_ticket_id = cspg.service_ticket_id AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $user->uid);
+    $uidarray = array('uid' => $user->uid);
+    db_query('UPDATE {cas_server_service} 
+                 SET current_valid_ticket = 0 
+               WHERE uid = :uid', $uidarray);
+    db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
+                 SET cspg.current_valid_ticket = 0 
+               WHERE css.uid = :uid AND css.service_ticket_id=cspg.service_ticket_id', $uidarray);
+    db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
+                 SET csp.current_valid_ticket = 0 
+               WHERE css.uid = :uid 
+                 AND css.service_ticket_id = cspg.service_ticket_id 
+                 AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uidarray);
     
     if (isset($_GET['url'])) {
       $url = urldecode($_GET['url']);
