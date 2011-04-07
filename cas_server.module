@@ -106,21 +106,34 @@ function cas_server_block() {
 }
 
 /**
- * Wrapper so that the login block gets altered too
- *
- * @param <type> $form
- * @param <type> $form_state
+ * We want to hide the login block on the CAS login page
+ * 
+ * @param type $blocks An array of $blocks, keyed by the block ID
+ * @return void
  */
-function cas_server_form_user_login_block_alter(&$form, &$form_state) {
+function cas_server_block_list_alter(&$blocks) {
+    
+    // Are we on the cas login page?
+    $destination = drupal_get_destination();
+    
+    if (isset($destination['destination']) &&
+        !empty($destination['destination']) &&
+        strpos($destination['destination'], 'cas_server/login') !== false) {
+        
+        // Need to identify the block with module = user and delta = login
+    
+        // user login block has bid = 4
+        foreach ($blocks as $key => $block) {
 
-    // Don't show two forms on one page if we are being redirected to the login page
-    if (strpos($form['#action'], 'cas_server/login')) {
-        $form = array();
-        return;
+            if ($block->module == 'user' && $block->delta == 'login') {
+                unset($blocks[$key]);
+            }
+
+        }
     }
-    cas_server_form_user_login_alter($form, $form_state);
-
+    
 }
+
 
 /**
  * Implemenation of hook_form_alter() for user_login form
@@ -181,6 +194,7 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
  * Form validation for the user_login form
  */
 function cas_server_user_login_validate($form, &$form_state) {
+    global $user;
     //This should never happen, but we need to check for it.
     if (!isset($_SESSION['cas']['lt_validated']) || !$_SESSION['cas']['lt_validated'] || !$_POST['cas_server_lt']) {
         form_set_error('other', '');
@@ -256,9 +270,14 @@ function cas_server_login_request($service, $warn=false, $renew=false, $gateway 
         ($renew) ||
         !$ticketgrantingcookie ||
         (!isset($_SESSION['cas'])) ||
+        !isset($_SESSION['cas']['current_tgc']) ||
         ($_SESSION['cas']['current_tgc'] != $ticketgrantingcookie))) {
 
-        if ($user->uid && $ticketgrantingcookie && ($_SESSION['cas']['current_tgc'] != $ticketgrantingcookie)) {
+        if ($user->uid && 
+            $ticketgrantingcookie && 
+            isset($_SESSION['cas']['current_tgc']) && 
+            ($_SESSION['cas']['current_tgc'] != $ticketgrantingcookie)) {
+            
             //This is a security issue. Someone is trying to hack the request
             $message = 'LOGIN invalid with bad cookie for user @uid(@name). The given cookie was @given but should have been @current.';
             watchdog('cas_server', $message, array(
@@ -279,10 +298,16 @@ function cas_server_login_request($service, $warn=false, $renew=false, $gateway 
     //Clear all the messages when moving on
     drupal_get_messages();
 
-    if (($user->uid) && ($ticketgrantingcookie) && ($_SESSION['cas']['current_tgc'] == $ticketgrantingcookie)) {
+    if (($user->uid) && 
+        ($ticketgrantingcookie) && 
+        isset($_SESSION['cas']['current_tgc']) && 
+        ($_SESSION['cas']['current_tgc'] == $ticketgrantingcookie)) {
+        
         if ($service) {
             $ticket = cas_server_new_service_ticket($user->uid, $service, $ticketgrantingcookie, $renewal);
+            
             if ($ticket) {
+                
                 if ($warn) {
                     $message = 'You are being authenticated for a new service. Click the link to continue: !service';
                     return t($message, array(
@@ -604,5 +629,31 @@ function cas_server_user_logout() {
         
     }
     
+    cas_server_single_sign_off();
+    
+    
+    
+    
+}
+
+function cas_server_single_sign_off() {
+    
+    // Need to invalidate all service tickets
+    
+    // get active service tickets for this user
+    $tickets = db_query('SELECT s.service_url, s.service_ticket
+                           FROM {cas_server_service} s
+                     INNER JOIN (SELECT service_url, MAX(expiration_time) 
+                                   FROM {cas_server_service}) maxtime
+                             ON s.service_url = maxtime.service_url
+                          WHERE uid = :uid', array('uid' => $user->uid));
+    
+    
+    foreach ($tickets as $ticket) {
+        
+        
+        
+        
+    }
 }
 

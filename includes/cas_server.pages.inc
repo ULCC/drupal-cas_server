@@ -20,37 +20,59 @@ function cas_server_login_page() {
  * Function callback for server_logout
  */
 function cas_server_logout_page() {
-  global $user;
-  
-  //Log the user out of the cas_server
-  if ($user->uid && isset($_SESSION['cas']['current_tgc'])) {
-    setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
-    unset($_SESSION['cas']['current_tgc']);
-    
-    //On service logout we need invalidate all valid tickets
-    $uidarray = array('uid' => $user->uid);
-    db_query('UPDATE {cas_server_service} 
+    global $user;
+
+    //Log the user out of the cas_server
+    if ($user->uid && isset($_SESSION['cas']['current_tgc'])) {
+
+        setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
+        unset($_SESSION['cas']['current_tgc']);
+
+        //On service logout we need invalidate all valid tickets
+        $uidarray = array('uid' => $user->uid);
+        db_query('UPDATE {cas_server_service} 
                  SET current_valid_ticket = 0 
                WHERE uid = :uid', $uidarray);
-    db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
+        db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
                  SET cspg.current_valid_ticket = 0 
                WHERE css.uid = :uid AND css.service_ticket_id=cspg.service_ticket_id', $uidarray);
-    db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
+        db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
                  SET csp.current_valid_ticket = 0 
                WHERE css.uid = :uid 
                  AND css.service_ticket_id = cspg.service_ticket_id 
                  AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uidarray);
+
+
+
+
+
+
+
+        if (isset($_GET['url'])) {
+            $url = urldecode($_GET['url']);
+            $message = 'The application you just logged out of has provided a link it would like you to follow. Please !link to access @url';
+            drupal_set_message(t($message, array(
+                  '!link' => l('click here', $url, array(
+                          'absolute' => TRUE)), 
+                  '@url' => url($url, array(
+                          'absolute' => TRUE)))));
+        }
+        else {
+            drupal_set_message(t('Successfully logged out of service'));
+        }
+    }
+  
+  
+    $destination = isset($_GET['url']) ? $_GET['url'] : null;
     
-    if (isset($_GET['url'])) {
-      $url = urldecode($_GET['url']);
-      drupal_set_message(t('The application you just logged out of has provided a link it would like you to follow. Please !link to access @url', array('!link' => l('click here', $url, array('absolute' => TRUE)), '@url' => url($url, array('absolute' => TRUE)), )));
-    }
-    else {
-      drupal_set_message(t('Successfully logged out of service'));
-    }
-  }
-  //Log the user out of drupal
-  drupal_goto('logout');
+    session_destroy();
+    module_invoke_all('user', 'logout', NULL, $user);
+
+    // Load the anonymous user
+    $user = drupal_anonymous_user();
+    
+    drupal_goto($destination);
+  
 }
 
 /**
