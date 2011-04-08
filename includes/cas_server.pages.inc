@@ -8,14 +8,11 @@ function cas_server_login_page() {
   global $user;
   
   $service = urldecode($_GET['service']);
-  $renew   = $_GET['renew'];
-  $gateway = $_GET['gateway'];
+  $renew   = isset($_GET['renew']) ? $_GET['renew'] : false;
+  $gateway = isset($_GET['gateway']) ? $_GET['gateway'] : false;
   // if $warn is not set, use the session one if it's there.
-  $warn = $_GET['warn'] || (isset($_SESSION['cas']['warn']) ? $_SESSION['cas']['warn'] : false);
+  $warn = isset($_GET['warn']) || (isset($_SESSION['cas']['warn']) ? $_SESSION['cas']['warn'] : false);
 
-
-
-  
   return cas_server_login_request($service, $warn, $renew, $gateway);
 }
 
@@ -27,6 +24,7 @@ function cas_server_logout_page() {
   
   //Log the user out of the cas_server
   if ($user->uid && isset($_SESSION['cas']['current_tgc'])) {
+
     setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
     unset($_SESSION['cas']['current_tgc']);
     
@@ -37,14 +35,29 @@ function cas_server_logout_page() {
     
     if (isset($_GET['url'])) {
       $url = urldecode($_GET['url']);
-      drupal_set_message(t('The application you just logged out of has provided a link it would like you to follow. Please !link to access @url', array('!link' => l('click here', $url, array('absolute' => TRUE)), '@url' => url($url, array('absolute' => TRUE)), )));
+            $message = 'The application you just logged out of has provided a link it would like you to follow. Please !link to access @url';
+            drupal_set_message(t($message, array(
+                  '!link' => l('click here', $url, array(
+                          'absolute' => TRUE)), 
+                  '@url' => url($url, array(
+                          'absolute' => TRUE)))));
     }
     else {
       drupal_set_message(t('Successfully logged out of service'));
     }
   }
-  //Log the user out of drupal
-  drupal_goto('logout');
+  
+  
+    $destination = isset($_GET['url']) ? $_GET['url'] : null;
+    
+    session_destroy();
+    module_invoke_all('user', 'logout', NULL, $user);
+
+    // Load the anonymous user
+    $user = drupal_anonymous_user();
+    
+    drupal_goto($destination);
+  
 }
 
 /**
