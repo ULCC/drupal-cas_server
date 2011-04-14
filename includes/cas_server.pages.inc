@@ -8,11 +8,15 @@ function cas_server_login_page() {
   global $user;
   
   $service = urldecode($_GET['service']);
+  $service = cas_server_validate_url($service);
   $renew   = isset($_GET['renew']) ? $_GET['renew'] : false;
+  // validation: make sure we only have a boolean
+  $renew = $renew ? true :false;
   $gateway = isset($_GET['gateway']) ? $_GET['gateway'] : false;
+  $gateway = $gateway ? true :false;
   // if $warn is not set, use the session one if it's there.
   $warn = isset($_GET['warn']) || (isset($_SESSION['cas']['warn']) ? $_SESSION['cas']['warn'] : false);
-
+  $warn = $warn ? true : false;
   return cas_server_login_request($service, $warn, $renew, $gateway);
 }
 
@@ -46,10 +50,15 @@ function cas_server_logout_page() {
 
 
 
-
+        $url = false;
 
         if (isset($_GET['url'])) {
             $url = urldecode($_GET['url']);
+            $url = cas_server_validate_url($url);
+        }
+            
+        if ($url) {
+            
             $message = 'The application you just logged out of has provided a link it would like you to follow. Please !link to access @url';
             drupal_set_message(t($message, array(
                   '!link' => l('click here', $url, array(
@@ -64,6 +73,7 @@ function cas_server_logout_page() {
   
   
     $destination = isset($_GET['url']) ? $_GET['url'] : null;
+    $destination = cas_server_validate_url($destination) ? $destination : null;
     
     session_destroy();
     module_invoke_all('user', 'logout', NULL, $user);
@@ -87,9 +97,23 @@ function cas_server_validate_page($v, $proxy_check = FALSE, $ticket=false) {
       // saml special case
       $service = urldecode($_GET['TARGET']);
   }
+  
+  $service = cas_server_validate_url($service);
+  
+  
+  
   $renew   = $_GET['renew'];
+  $renew   = $renew ? true : false;
   $sticket = (empty($ticket)) ? $_GET['ticket'] : $ticket;
+  
+  if (is_string($ticket) && !preg_match('/^[A-Za-z0-9\-]{32}$/', $ticket)) {
+      error_log('ticket failed validation in validate_page');
+      $ticket = false;
+  }
+  
   $pgtUrl = urldecode($_GET['pgtUrl']);
+  $pgtUrl = cas_server_validate_url($pgtUrl);
+  
   $proxy = FALSE;
   
   if (!$service) {
@@ -162,7 +186,13 @@ function cas_server_validate_saml_page($v, $proxy_check = FALSE) {
  */
 function cas_server_proxy_page() {
   $targetService  = urldecode($_GET['targetService']);
+  $targetService = cas_server_validate_url($targetService);
   $pgt   = $_GET['pgt'];
+  
+  if (is_string($pgt) && !preg_match('/^[A-Za-z0-9\-]{32}$/', $pgt)) {
+      error_log('ticket failed validation in validate_page');
+      $ticket = false;
+  }
   
   $response = array('proxy' => TRUE);
   if (!$targetService || !$pgt) {

@@ -165,6 +165,8 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
     
     if (isset($_GET['service'])) {
         $service = urldecode($_GET['service']);
+        // validate as a proper url
+        $service = cas_server_validate_url($service);
     }
     
     if ($service) {
@@ -201,17 +203,33 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
     $form['#cache'] = FALSE;
 }
 
+function cas_server_validate_url($url) {
+    if (!is_string($url) || !preg_match("/^(http|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&amp;:/~\+#]*[\w\-\@?^=%&amp;/~\+#])?/i", $service)) {
+        error_log("URL {$url} not valid");
+        return false;
+    }
+    return $url;
+}
+
 /**
  * Form validation for the user_login form
  */
 function cas_server_user_login_validate($form, &$form_state) {
+    
+    $loginticket = $_POST['cas_server_lt'];
+    // Needs validating as 32 characters of letters, numbers including LT- at the start
+    if (!preg_match('/^LT-[A-Za-z0\-9]{29}$/', $url)) {
+        error_log('Login ticket does not validate');
+        $loginticket = false;
+    }
+    
     //This should never happen, but we need to check for it.
-    if (!isset($_SESSION['cas']['lt_validated']) || !$_SESSION['cas']['lt_validated'] || !$_POST['cas_server_lt']) {
+    if (!isset($_SESSION['cas']['lt_validated']) || !$_SESSION['cas']['lt_validated'] || !$loginticket) {
         form_set_error('other', '');
     }
     //Use _POST here because drupal form handling replaces hidden values with the form value before submission.
     //We really want to check to make sure the value wasn't tampered with.
-    else if ($_POST['cas_server_lt'] != $_SESSION['cas']['lt_validated']) {
+    else if ($loginticket != $_SESSION['cas']['lt_validated']) {
         //Someone changed the login ticket in the form. This is some form of an attack.
         $message = 'LOGIN invalid with non-matching login ticket. The given lt was @given but should have been @current.';
         watchdog('cas_server', $message, array(
