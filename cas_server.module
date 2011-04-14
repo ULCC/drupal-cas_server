@@ -146,7 +146,6 @@ function cas_server_form_user_login_block_alter(&$form, &$form_state) {
 
 }
 
-
 /**
  * Implemenation of hook_form_alter() for user_login form
  */
@@ -206,7 +205,6 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
  * Form validation for the user_login form
  */
 function cas_server_user_login_validate($form, &$form_state) {
-    global $user;
     //This should never happen, but we need to check for it.
     if (!isset($_SESSION['cas']['lt_validated']) || !$_SESSION['cas']['lt_validated'] || !$_POST['cas_server_lt']) {
         form_set_error('other', '');
@@ -660,9 +658,9 @@ function cas_server_single_sign_off() {
     // get active service tickets for this user
     $tickets = db_query('SELECT c.service_ticket_id, c.service_url, c.service_ticket, u.name
                            FROM (SELECT MAX(service_ticket_id) AS id, service_url
-                                   FROM cas_server_service
+                                   FROM {cas_server_service}
                                GROUP BY service_url) time
-                     INNER JOIN cas_server_service c
+                     INNER JOIN {cas_server_service} c
                              ON (time.id = c.service_ticket_id 
                                  AND c.service_url = time.service_url)
                      INNER JOIN {users} u
@@ -687,8 +685,6 @@ function cas_server_single_sign_off() {
         curl_setopt($curlhandle, CURLOPT_RETURNTRANSFER, true); // debugging - change to false after testing
         $response = curl_exec($curlhandle);
         curl_close($curlhandle);
-        
-        //exit();
         
     }
 }
