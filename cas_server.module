@@ -135,7 +135,7 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
     
     $service = false;
     
-    if (isset($_GET['service'])) {
+    if (isset($_GET['service']) && !empty($_GET['service'])) {
         $service = urldecode($_GET['service']);
         // validate as a proper url
         $service = cas_server_validate_url($service);
@@ -220,6 +220,7 @@ function cas_server_user_login_validate($form, &$form_state) {
  * @return void
  */
 function cas_server_user_login_submit($form, &$form_state) {
+    
     if ($_SESSION['cas']['lt_validated']) {
 
         $formwarningset = (isset($form_state['values']['cas_server_warn']) && !empty($form_state['values']['cas_server_warn']));
@@ -242,6 +243,8 @@ function cas_server_user_login_submit($form, &$form_state) {
         if (isset($form_state['values']['cas_server_service']) && !empty($form_state['values']['cas_server_service'])) {
             cas_server_login_request($form_state['values']['cas_server_service'], FALSE, FALSE, NULL, TRUE);
         }
+    } else {
+        error_log('Session lt-validated not set');
     }
 }
 
@@ -267,12 +270,12 @@ function cas_server_login_request($service, $warn=false, $renew=false, $gateway 
     //  - There is no ticket granting cookie (would occur if the user closed their browser session)
     //  - The current ticket granting cookie does not match the one of the currently logged in user
     if (!$gateway && (
-            (!$user->uid) ||
-        ($renew) ||
-        !$ticketgrantingcookie ||
-        (!isset($_SESSION['cas'])) ||
-        !isset($_SESSION['cas']['current_tgc']) ||
-        ($_SESSION['cas']['current_tgc'] != $ticketgrantingcookie))) {
+            !$user->uid ||
+            $renew ||
+            !$ticketgrantingcookie ||
+            !isset($_SESSION['cas']) ||
+            !isset($_SESSION['cas']['current_tgc']) ||
+            $_SESSION['cas']['current_tgc'] != $ticketgrantingcookie)) {
 
         if ($user->uid && 
             $ticketgrantingcookie && 
@@ -298,11 +301,15 @@ function cas_server_login_request($service, $warn=false, $renew=false, $gateway 
 
     //Clear all the messages when moving on
     drupal_get_messages();
+    
+    if (!($_SESSION['cas']['current_tgc'] == $ticketgrantingcookie)) {
+        error_log('ticket granting cookie does not match the session cookie');
+    }
 
-    if (($user->uid) && 
-        ($ticketgrantingcookie) && 
+    if ($user->uid && 
+        $ticketgrantingcookie && 
         isset($_SESSION['cas']['current_tgc']) && 
-        ($_SESSION['cas']['current_tgc'] == $ticketgrantingcookie)) {
+        $_SESSION['cas']['current_tgc'] == $ticketgrantingcookie) {
         
         if ($service) {
             $ticket = cas_server_new_service_ticket($user->uid, $service, $ticketgrantingcookie, $renewal);
@@ -329,6 +336,7 @@ function cas_server_login_request($service, $warn=false, $renew=false, $gateway 
         }
         //Fall through to the home page redirection
     } else if ($service && $gateway) {
+        
         drupal_goto($service, array());
     }
 
@@ -589,36 +597,50 @@ function _cas_server_login_form_altered($add = FALSE) {
  */
 function cas_server_user($op, &$edit, &$account, $category = NULL) {
     
-    if ($op == 'logout') {
+    switch ($op) {
     
-        global $user;
+        case 'logout':
+            global $user;
 
-        if (isset($_SESSION['cas']['current_tgc'])) {
+            if (isset($_SESSION['cas']['current_tgc'])) {
 
-            setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
-            unset($_SESSION['cas']['current_tgc']);
+                setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
+                unset($_SESSION['cas']['current_tgc']);
 
-            $uidarray = array('uid' => $user->uid);
+                $uidarray = array('uid' => $user->uid);
 
-            //On service logout we need invalidate all valid tickets
-            db_query('UPDATE {cas_server_service} 
-                         SET current_valid_ticket = 0 
-                       WHERE uid = :uid', $uidarray);
-            db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
-                         SET cspg.current_valid_ticket = 0 
-                       WHERE css.uid = :uid AND css.service_ticket_id=cspg.service_ticket_id', $uidarray);
-            db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
-                         SET csp.current_valid_ticket = 0 
-                       WHERE css.uid = :uid 
-                         AND css.service_ticket_id = cspg.service_ticket_id 
-                         AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uidarray);
+                //On service logout we need invalidate all valid tickets
+                db_query('UPDATE {cas_server_service} 
+                             SET current_valid_ticket = 0 
+                           WHERE uid = :uid', $uidarray);
+                db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
+                             SET cspg.current_valid_ticket = 0 
+                           WHERE css.uid = :uid AND css.service_ticket_id=cspg.service_ticket_id', $uidarray);
+                db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
+                             SET csp.current_valid_ticket = 0 
+                           WHERE css.uid = :uid 
+                             AND css.service_ticket_id = cspg.service_ticket_id 
+                             AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uidarray);
+            }
 
+            cas_server_single_sign_off();
+            break;
+            
+        case 'login':
+            
+            // need to set the TGC if not coming via the login form (first time email login)
+            //Set the ticket granting cookie if needed
+            $tgc = _cas_server_load_ticket_granting_cookie();
 
-        }
+            if ((!$tgc) ||
+                (!isset($_SESSION['cas']['current_tgc'])) ||
+                ($_SESSION['cas']['current_tgc'] != $tgc)) {
 
-        cas_server_single_sign_off();
+                _cas_server_set_ticket_granting_cookie();
+            }
+            
+            break;
     }
-    
     
     
     
@@ -629,7 +651,7 @@ function cas_server_single_sign_off() {
     global $user;
     // Need to invalidate all service tickets
     
-    // get active service tickets for this user
+    // get most recent active service ticket for each service for this user
     $tickets = db_query('SELECT c.service_ticket_id, c.service_url, c.service_ticket, u.name
                            FROM (SELECT MAX(service_ticket_id) AS id, service_url
                                    FROM {cas_server_service}
@@ -640,8 +662,6 @@ function cas_server_single_sign_off() {
                      INNER JOIN {users} u
                              ON c.uid = u.uid
                           WHERE c.uid = %d', $user->uid);
-    
-    //error_log($user->uid);
     
     
     while ($ticket = db_fetch_object($tickets)) {
@@ -654,13 +674,19 @@ function cas_server_single_sign_off() {
                     </samlp:LogoutRequest>';
         
         $url = $ticket->service_url;
-        $url .= '?XDEBUG_SESSION_START=netbeans-xdebug';  // Debugging - remove this in production
+        //$url .= '?XDEBUG_SESSION_START=netbeans-xdebug';  // Debugging - remove this in production
         $curlhandle = curl_init($url);
         curl_setopt($curlhandle, CURLOPT_POST, true);
         curl_setopt($curlhandle, CURLOPT_POSTFIELDS, array('logoutRequest' => $payload));
         curl_setopt($curlhandle, CURLOPT_RETURNTRANSFER, true); // debugging - change to false after testing
+//        curl_setopt($curlhandle, CURLOPT_RETURNTRANSFER, false); 
         $response = curl_exec($curlhandle);
         curl_close($curlhandle);
+        
+//        echo $response;
+//        die();
+        
+        // TODO tidy things up by deleting old service tickets.
         
         
     }
