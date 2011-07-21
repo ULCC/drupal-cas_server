@@ -147,14 +147,15 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
                 '#value' => $service,
         );
         
-        $message = 'This login request came from @service. By entering your credentials below, you '.
-                   'will be authenticated and redirected to this site.';
+        // Not needed if we want to make it look like we have one unified site
+//        $message = 'This login request came from @service. By entering your credentials below, you '.
+//                   'will be authenticated and redirected to this site.';
         
         drupal_set_message(t($message, array('@service' => $service)));
     }
 
     //Find the current login ticket
-    if (isset($_SESSION['cas']) && isset($_SESSION['cas']['lt']) && isset($_SESSION['cas']['lt_valid'])) {
+    if (isset($_SESSION['cas']) && isset($_SESSION['cas']['lt']) && isset($_SESSION['cas']['lt_valid']) && $_SESSION['cas']['lt_valid']) {
         //As soon as we grab it again, it is no longer valid.
         $_SESSION['cas']['lt_valid'] = FALSE;
         $_SESSION['cas']['lt_validated'] = $_SESSION['cas']['lt'];
@@ -607,20 +608,20 @@ function cas_server_user($op, &$edit, &$account, $category = NULL) {
                 setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
                 unset($_SESSION['cas']['current_tgc']);
 
-                $uidarray = array('uid' => $user->uid);
+                $uid = $user->uid;
 
                 //On service logout we need invalidate all valid tickets
                 db_query('UPDATE {cas_server_service} 
                              SET current_valid_ticket = 0 
-                           WHERE uid = :uid', $uidarray);
+                           WHERE uid = %d', $uid);
                 db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
                              SET cspg.current_valid_ticket = 0 
-                           WHERE css.uid = :uid AND css.service_ticket_id=cspg.service_ticket_id', $uidarray);
+                           WHERE css.uid = %d AND css.service_ticket_id=cspg.service_ticket_id', $uid);
                 db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
                              SET csp.current_valid_ticket = 0 
-                           WHERE css.uid = :uid 
+                           WHERE css.uid = %d 
                              AND css.service_ticket_id = cspg.service_ticket_id 
-                             AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uidarray);
+                             AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uid);
             }
 
             cas_server_single_sign_off();
