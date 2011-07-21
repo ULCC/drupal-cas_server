@@ -147,15 +147,15 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
                 '#type' => 'hidden',
                 '#value' => $service,
         );
-        
-        $message = 'This login request came from @service. By entering your credentials below, you '.
-                   'will be authenticated and redirected to this site.';
+        // Not sure we want this - we want the appearance of a unified system
+//        $message = 'This login request came from @service. By entering your credentials below, you '.
+//                   'will be authenticated and redirected to this site.';
         
         drupal_set_message(t($message, array('@service' => $service)));
     }
 
     //Find the current login ticket
-    if (isset($_SESSION['cas']) && isset($_SESSION['cas']['lt']) && isset($_SESSION['cas']['lt_valid'])) {
+    if (isset($_SESSION['cas']) && isset($_SESSION['cas']['lt']) && isset($_SESSION['cas']['lt_valid']) && $_SESSION['cas']['lt_valid']) {
         //As soon as we grab it again, it is no longer valid.
         $_SESSION['cas']['lt_valid'] = FALSE;
         $_SESSION['cas']['lt_validated'] = $_SESSION['cas']['lt'];
@@ -176,6 +176,12 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
     $form['#cache'] = FALSE;
 }
 
+/**
+ * Security thingy to prevent dodgy code in urls by passing them through a regex that checks they're valid
+ * 
+ * @param string $url
+ * @return string|bool false if it's not valid
+ */
 function cas_server_validate_url($url) {
     if (!is_string($url) || !preg_match("/^(http|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&amp;:\/~\+#]*[\w\-\@?^=%&amp;\/~\+#])?$/i", $url)) {
         error_log("URL {$url} not valid");
@@ -186,6 +192,10 @@ function cas_server_validate_url($url) {
 
 /**
  * Form validation for the user_login form
+ * 
+ * @param object $form
+ * @param object $form_state
+ * @return void
  */
 function cas_server_user_login_validate($form, &$form_state) {
 
@@ -217,7 +227,7 @@ function cas_server_user_login_validate($form, &$form_state) {
  * Form submission for the user_login form. Implemetation of hook_user that fires once the form is submitted
  *
  * @param object $form
- * @param   $form_state
+ * @param object $form_state
  * @return void
  */
 function cas_server_user_login_submit($form, &$form_state) {
@@ -624,57 +634,60 @@ function _cas_server_login_form_altered($add = FALSE) {
  * 
  * @global  $user 
  */
-function cas_server_user($op, &$edit, &$account, $category = NULL) {
+function cas_server_user_logout($account) {
     
-    switch ($op) {
-    
-        case 'logout':
-            global $user;
+    if (isset($_SESSION['cas']['current_tgc'])) {
 
-            if (isset($_SESSION['cas']['current_tgc'])) {
+        setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
+        unset($_SESSION['cas']['current_tgc']);
 
-                setcookie(CAS_SERVER_COOKIE_NAME, FALSE);
-                unset($_SESSION['cas']['current_tgc']);
+        $uidarray = array('uid' => $account->uid);
 
-                $uidarray = array('uid' => $user->uid);
-
-                //On service logout we need invalidate all valid tickets
-                db_query('UPDATE {cas_server_service} 
-                             SET current_valid_ticket = 0 
-                           WHERE uid = :uid', $uidarray);
-                db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
-                             SET cspg.current_valid_ticket = 0 
-                           WHERE css.uid = :uid AND css.service_ticket_id=cspg.service_ticket_id', $uidarray);
-                db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
-                             SET csp.current_valid_ticket = 0 
-                           WHERE css.uid = :uid 
-                             AND css.service_ticket_id = cspg.service_ticket_id 
-                             AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uidarray);
-            }
-
-            cas_server_single_sign_off();
-            break;
-            
-        case 'login':
-            
-            // need to set the TGC if not coming via the login form (first time email login)
-            //Set the ticket granting cookie if needed
-            $tgc = _cas_server_load_ticket_granting_cookie();
-
-            if ((!$tgc) ||
-                (!isset($_SESSION['cas']['current_tgc'])) ||
-                ($_SESSION['cas']['current_tgc'] != $tgc)) {
-
-                _cas_server_set_ticket_granting_cookie();
-            }
-            
-            break;
+        //On service logout we need invalidate all valid tickets
+        db_query('UPDATE {cas_server_service} 
+                     SET current_valid_ticket = 0 
+                   WHERE uid = :uid', $uidarray);
+        db_query('UPDATE {cas_server_proxy_granting} cspg, {cas_server_service} css 
+                     SET cspg.current_valid_ticket = 0 
+                   WHERE css.uid = :uid AND css.service_ticket_id=cspg.service_ticket_id', $uidarray);
+        db_query('UPDATE {cas_server_proxy} csp, {cas_server_proxy_granting} cspg, {cas_server_service} css 
+                     SET csp.current_valid_ticket = 0 
+                   WHERE css.uid = :uid 
+                     AND css.service_ticket_id = cspg.service_ticket_id 
+                     AND csp.proxy_granting_ticket_id = cspg.proxy_granting_ticket_id', $uidarray);
     }
-    
-    
-    
+
+    cas_server_single_sign_off();
 }
 
+/**
+ * Sets the ticket granting cookie. Needed here as if we rely only on logion form alterations, then the user's
+ * first login via an email link doesn't work.
+ * 
+ * @param type $edit
+ * @param type $account 
+ * @return void
+ */
+function cas_server_user_login(&$edit, $account) {
+    
+    // need to set the TGC if not coming via the login form (first time email login)
+    //Set the ticket granting cookie if needed
+    $tgc = _cas_server_load_ticket_granting_cookie();
+
+    if ((!$tgc) ||
+        (!isset($_SESSION['cas']['current_tgc'])) ||
+        ($_SESSION['cas']['current_tgc'] != $tgc)) {
+
+        _cas_server_set_ticket_granting_cookie();
+    }
+}
+
+/**
+ * Makes sure that all other systems that have asked for a single sign in authorisation recieve notice 
+ * that the user has logged off so remote sessions can be destroyed.
+ * 
+ * @return void 
+ */
 function cas_server_single_sign_off() {
     
     global $user;
