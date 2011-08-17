@@ -151,7 +151,7 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
 //        $message = 'This login request came from @service. By entering your credentials below, you '.
 //                   'will be authenticated and redirected to this site.';
         
-        drupal_set_message(t($message, array('@service' => $service)));
+        //drupal_set_message(t($message, array('@service' => $service)));
     }
 
     //Find the current login ticket
