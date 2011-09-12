@@ -159,6 +159,9 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
         //As soon as we grab it again, it is no longer valid.
         $_SESSION['cas']['lt_valid'] = FALSE;
         $_SESSION['cas']['lt_validated'] = $_SESSION['cas']['lt'];
+        error_log('Login ticket '.$_SESSION['cas']['lt'].' validated');
+    } else {
+        error_log('Current login ticket not found in session, so incoming ticket '.$form_state['cas_server_lt'].' cannot be validated against it' );
     }
     //Create a new login ticket. This is to handle the case when the login fails.
     //The ticket is stored above as long as it is validated
@@ -178,7 +181,7 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
 
 function cas_server_validate_url($url) {
     if (!is_string($url) || !preg_match("/^(http|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&amp;:\/~\+#]*[\w\-\@?^=%&amp;\/~\+#])?$/i", $url)) {
-        error_log("URL {$url} not valid");
+        error_log("URL '{$url}' not valid");
         return false;
     }
     return $url;
