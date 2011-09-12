@@ -154,7 +154,7 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
         drupal_set_message(t($message, array('@service' => $service)));
     }
 
-    //Find the current login ticket
+    // Find the current login ticket. Always fails for uid = 0
     if (isset($_SESSION['cas']) && isset($_SESSION['cas']['lt']) && isset($_SESSION['cas']['lt_valid']) && $_SESSION['cas']['lt_valid']) {
         //As soon as we grab it again, it is no longer valid.
         $_SESSION['cas']['lt_valid'] = FALSE;
@@ -642,11 +642,15 @@ function cas_server_user($op, &$edit, &$account, $category = NULL) {
             
             break;
     }
-    
-    
-    
 }
 
+/**
+ * Find all the other services that have connected and have run through an auth sequence using this session and
+ * disconnect them remotely using a curl request to their (theoretically existent) CAS logout page.
+ * 
+ * @global  $user 
+ * @return void
+ */
 function cas_server_single_sign_off() {
     
     global $user;
@@ -684,10 +688,9 @@ function cas_server_single_sign_off() {
         $response = curl_exec($curlhandle);
         curl_close($curlhandle);
         
-//        echo $response;
-//        die();
         
         // TODO tidy things up by deleting old service tickets.
+        // Some may remain if the user just shuts the browser and this routine is never called.
         
         
     }
