@@ -695,7 +695,7 @@ function cas_server_single_sign_off() {
     while ($ticket = db_fetch_object($tickets)) {
 
         if (CAS_SERVER_DEBUG) {
-            error_log('Found a service ticket');
+            error_log('Found service ticket '.$ticket->service_ticket.' for '.$user->name);
         }
 
         $payload = '<samlp:LogoutRequest ID="[RANDOM ID]" Version="2.0" IssueInstant="'.time().'">
@@ -710,7 +710,7 @@ function cas_server_single_sign_off() {
         curl_setopt($curlhandle, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($curlhandle);
         if (CAS_SERVER_DEBUG) {
-            error_log($response);
+            error_log('Curl response: '.$response);
         }
         curl_close($curlhandle);
 
