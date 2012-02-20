@@ -121,9 +121,12 @@ function cas_server_form_user_login_block_alter(&$form, &$form_state) {
 
 /**
  * Implemenation of hook_form_alter() for user_login form
+ *
+ * @param $form
+ * @param $form_state
  */
 function cas_server_form_user_login_alter(&$form, &$form_state) {
-    global $user;
+
     if (variable_get('cas_server_warning_box', FALSE)) {
         $form['cas_server_warn'] = array(
                 '#type' => 'checkbox',
@@ -152,7 +155,7 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
 //        $message = 'This login request came from @service. By entering your credentials below, you '.
 //                   'will be authenticated and redirected to this site.';
 
-        drupal_set_message(t($message, array('@service' => $service)));
+        //drupal_set_message(t($message, array('@service' => $service)));
     }
 
     // Find the current login ticket. Always fails for uid = 0
