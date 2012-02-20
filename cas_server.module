@@ -11,7 +11,7 @@
  * ******************* */
 
 define('CAS_SERVER_COOKIE_NAME', 'TGCCAS');
-define('CAS_SERVER_DEBUG', false);
+define('CAS_SERVER_DEBUG', true);
 
 /**
  * Implementation of hook_menu()
