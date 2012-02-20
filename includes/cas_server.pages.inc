@@ -1,6 +1,6 @@
 <?php
 
-// $Id: cas_server.pages.inc,v 1.1 2009/10/08 20:51:58 jtenman Exp $ 
+// $Id: cas_server.pages.inc,v 1.1 2009/10/08 20:51:58 jtenman Exp $
 
 /**
  * The callback when someone visits cas_server/login
@@ -96,7 +96,9 @@ function cas_server_validate_page($v, $proxy_check = FALSE, $ticket=false) {
     $sticket = (empty($ticket)) ? $_GET['ticket'] : $ticket;
 
     if (is_string($ticket) && !preg_match('/^[A-Za-z0-9\-]{32}$/', $ticket)) {
-        error_log('ticket failed validation in validate_page');
+        if (CAS_SERVER_DEBUG) {
+            error_log('ticket failed validation in validate_page');
+        }
         $ticket = false;
     }
 
@@ -178,7 +180,9 @@ function cas_server_proxy_page() {
     $pgt = $_GET['pgt'];
 
     if (is_string($pgt) && !preg_match('/^[A-Za-z0-9\-]{32}$/', $pgt)) {
-        error_log('ticket failed validation in validate_page');
+        if (CAS_SERVER_DEBUG) {
+            error_log('ticket failed validation in validate_page');
+        }
         $ticket = false;
     }
 
@@ -295,14 +299,14 @@ function _cas_server_validate_response($v, $value) {
 
 /**
  * Processes the ticket to create a SAML response. Not sure what the saml responseid should be...
- * 
+ *
  * @param array $results the ticket with attributes
  * @return string the SAML document
  */
 function _cas_server_validate_response_saml($results) {
 
     $result = '
-        
+
         <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
           <SOAP-ENV:Header />
           <SOAP-ENV:Body>
