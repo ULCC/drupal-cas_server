@@ -702,22 +702,19 @@ function cas_server_single_sign_off() {
 
     // Need to invalidate all service tickets
 
-    // get most recent active service ticket for each service for this user
+    // get all active service tickets for each service for this user. If we don't do this, we end up
+    // with stale ones lying about which messes up the logout process if the browser session
+    // expires
     $tickets = db_query('SELECT c.service_ticket_id,
                                 c.service_url,
                                 c.service_ticket,
                                 u.name
-                           FROM (SELECT MAX(service_ticket_id) AS id,
-                                        service_url
-                                   FROM {cas_server_service}
-                               GROUP BY service_url) time
-                     INNER JOIN {cas_server_service} c
-                             ON (time.id = c.service_ticket_id
-                                 AND c.service_url = time.service_url)
+                           FROM {cas_server_service} c
                      INNER JOIN {users} u
                              ON c.uid = u.uid
                           WHERE c.uid = %d', $user->uid);
 
+    $ticketstoexpire = array();
 
     while ($ticket = db_fetch_object($tickets)) {
 
@@ -737,15 +734,35 @@ function cas_server_single_sign_off() {
         curl_setopt($curlhandle, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($curlhandle);
         if (CAS_SERVER_DEBUG) {
-            error_log('Curl response: '.$response);
+            error_log('Curl response to CAS logout request: '.$response);
         }
+
+        $status = curl_getinfo($curlhandle, CURLINFO_HTTP_CODE);
+        if ($status == 200) {
+            // If the server is not available, we want to keep things clean by retrying the delete
+            // This could be an issue if a site moves, as we'd get an attempt on each logout
+            // forever, but this is unlikely and a small overhead
+            $ticketstoexpire[] = $ticket->service_ticket_id;
+        } else {
+            if (CAS_SERVER_DEBUG) {
+                $message = 'Curl CAS logout connection to '.$url.' failed for service ticket '.
+                           $ticket->service_ticket_id;
+                error_log($message);
+            }
+        }
+
         curl_close($curlhandle);
+    }
 
-
-        // TODO tidy things up by deleting old service tickets.
-        // Some may remain if the user just shuts the browser and this routine is never called.
-
-
+    // Whether or not curl worked, we still want to delete the ticket. The only time we wouldn't
+    // want to is if the server is unavailable, which would have been skipped above.
+    foreach($ticketstoexpire as $ticketid) {
+        $sql = "DELETE FROM {cas_server_service}
+                WHERE service_ticket_id = %d ";
+        db_query($sql, $ticketid);
+        if (CAS_SERVER_DEBUG) {
+            error_log('Service ticket deleted: '.$ticketid);
+        }
     }
 }
 
