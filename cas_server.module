@@ -167,8 +167,12 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
             error_log('Login ticket '.$_SESSION['cas']['lt'].' validated');
         }
     } else {
+
+        // TODO sometimes (often, in fact), this is logging an empty incoming ticket, which it shouldn't be.
         if (CAS_SERVER_DEBUG) {
-            error_log('Current login ticket not found in session, so incoming ticket '.$form_state['cas_server_lt'].' cannot be validated against it' );
+            $message = 'Current login ticket not found in session, so incoming ticket '.
+                       $form_state['cas_server_lt'].' cannot be validated against it';
+            error_log($message);
         }
     }
     //Create a new login ticket. This is to handle the case when the login fails.
@@ -187,7 +191,23 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
     $form['#cache'] = FALSE;
 }
 
+/**
+ * Protects against dodgy attacks with XSS stuff.
+ *
+ * @param $url
+ * @return bool
+ */
 function cas_server_validate_url($url) {
+
+    if (CAS_SERVER_DEBUG && empty($url)) {
+        $level = 1;
+        $trace = debug_backtrace();
+        $file   = $trace[$level]['file'];
+        $line   = $trace[$level]['line'];
+        $function = $trace[$level]['function'];
+        error_log('cas_server_validate_url() called with empty url by '.$function.' at line '.$line.' in '.$file);
+    }
+
     if (!is_string($url) || !preg_match("/^(http|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&amp;:\/~\+#]*[\w\-\@?^=%&amp;\/~\+#])?$/i", $url)) {
         if (CAS_SERVER_DEBUG) {
             error_log("URL '{$url}' not valid");
