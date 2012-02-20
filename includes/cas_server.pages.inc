@@ -4,12 +4,10 @@
 
 /**
  * The callback when someone visits cas_server/login
+ *
+ * @return array|null|string
  */
 function cas_server_login_page() {
-
-    //error_log('login page function');
-
-    global $user;
 
     $service = urldecode($_GET['service']);
     $service = cas_server_validate_url($service);
@@ -78,6 +76,10 @@ function cas_server_logout_page() {
  * The callback when someone visits cas_server/validate or cas_server/serviceValidate or cas_server/proxyValidate
  * $v - The version of the request. Currently 1.0 and 2.0 supported. And S1 (saml) - Matt
  * $proxy_check - Whether or not to check if the ticket is a proxy ticket or not
+ *
+ * @param      $v
+ * @param bool $proxy_check
+ * @param bool $ticket
  */
 function cas_server_validate_page($v, $proxy_check = FALSE, $ticket=false) {
 
@@ -88,8 +90,6 @@ function cas_server_validate_page($v, $proxy_check = FALSE, $ticket=false) {
     }
 
     $service = cas_server_validate_url($service);
-
-
 
     $renew = $_GET['renew'];
     $renew = $renew ? true : false;
@@ -151,7 +151,7 @@ function cas_server_validate_page($v, $proxy_check = FALSE, $ticket=false) {
  * Need to get the ticket from the saml soap request
  *
  * @param <type> $v
- * @param <type> $proxy_check
+ * @param bool $proxy_check
  */
 function cas_server_validate_saml_page($v, $proxy_check = FALSE) {
 
@@ -218,6 +218,12 @@ function cas_server_proxy_page() {
  * $pgtUrl - The url to pass the proxy granting ticket id and iou to
  * $ticket - The service ticket that is being used to obtain this proxy
  * $response - Array that can be used to store the results to return to the service
+ *
+ * @param $pgtUrl
+ * @param $ticket
+ * @param $response
+ *
+ * @return bool
  */
 function cas_server_handle_pgt_request($pgtUrl, $ticket, &$response) {
     $type = strtolower(drupal_substr($pgtUrl, 0, 5));
@@ -230,7 +236,7 @@ function cas_server_handle_pgt_request($pgtUrl, $ticket, &$response) {
     $pgt_iou = _cas_server_generate_ticket('PGTIOU', 64);
     $url = $pgtUrl.'?pgtId='.$pgt.'&pgtIou='.$pgt_iou;
 
-    //CAS MUST verify both that the SSL certificate is valid and that its name matches that of the service
+    // CAS MUST verify both that the SSL certificate is valid and that its name matches that of the service
     $headers[CURLOPT_SSL_VERIFYPEER] = TRUE;
     $headers[CURLOPT_SSL_VERIFYHOST] = 2;
 
@@ -246,11 +252,18 @@ function cas_server_handle_pgt_request($pgtUrl, $ticket, &$response) {
     $ch = curl_init();
     curl_setopt_array($ch, $headers);
     $output = trim(curl_exec($ch));
+    if (CAS_SERVER_DEBUG) {
+        error_log($output);
+    }
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
     if ($code == 200) {
-        $proxy_granting_ticket = array('service_ticket_id' => $ticket->service_ticket_id, 'callback_url' => $pgtUrl, 'proxy_ticket' => $pgt, 'proxy_ticket_iou' => $pgt_iou, 'current_valid_ticket' => 1);
+        $proxy_granting_ticket = array('service_ticket_id' => $ticket->service_ticket_id,
+                                       'callback_url' => $pgtUrl,
+                                       'proxy_ticket' => $pgt,
+                                       'proxy_ticket_iou' => $pgt_iou,
+                                       'current_valid_ticket' => 1);
         drupal_write_record('cas_server_proxy_granting', $proxy_granting_ticket);
         $response['pgt'] = $pgt_iou;
         $response['proxies'] = array($pgtUrl);
@@ -270,6 +283,9 @@ function cas_server_handle_pgt_request($pgtUrl, $ticket, &$response) {
  *   'proxies' - An array of proxies used to provide the proxy granting cookie
  *   'code'    - If the request was not successful, the error code to be returned
  *   'error'   - Descriptive text of what the actual error was
+ *
+ * @param $v
+ * @param $value
  */
 function _cas_server_validate_response($v, $value) {
 
@@ -305,6 +321,7 @@ function _cas_server_validate_response($v, $value) {
  */
 function _cas_server_validate_response_saml($results) {
 
+    // TODO use PHP SOAP library
     $result = '
 
         <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
@@ -401,6 +418,10 @@ function _cas_server_validate_response_saml($results) {
 /**
  * XML creator for the version 2.0 responses. See _cas_server_validate_response()
  * for values of the $results array.
+ *
+ * @param array $results
+ *
+ * @return string
  */
 function _cas_server_validate_respnse_xml($results) {
     $result = "<?xml version=\"1.0\"?>\n";
@@ -444,12 +465,9 @@ function _cas_server_validate_respnse_xml($results) {
  */
 function cas_server_userdata_page() {
 
-    // permissions check?
-    // right now, it only works for the data of the logged in user, so should be fine
-
     global $user;
 
-    $extendeduser = user_load(array(uid => $user->uid));
+    $extendeduser = user_load(array('uid' => $user->uid));
 
     if (!$user->uid) {
         return;
@@ -461,17 +479,8 @@ function cas_server_userdata_page() {
     $userdata->firstname = $extendeduser->profile_forenames;
     $userdata->lastname = $extendeduser->profile_surname;
 
-
-
-//    header('Cache-Control: no-cache, must-revalidate');
-//    header('Expires: Mon, 26 Jul 2011 05:00:00 GMT');
     header('Content-type: text/javascript');
-    // header('Content-Transfer-Encoding: binary');
-    // echo '<html>';
     print drupal_to_js($userdata);
-    // echo json_encode($userdata);
-    // echo '</html>';
-    //exit();
 }
 
 /**
