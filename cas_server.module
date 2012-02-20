@@ -159,16 +159,18 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
     }
 
     // Find the current login ticket. Always fails for uid = 0
-    if (isset($_SESSION['cas']) && isset($_SESSION['cas']['lt']) && isset($_SESSION['cas']['lt_valid']) && $_SESSION['cas']['lt_valid']) {
+    if (isset($_SESSION['cas']) &&
+        isset($_SESSION['cas']['lt']) &&
+        isset($_SESSION['cas']['lt_valid']) && $_SESSION['cas']['lt_valid']) {
+
         //As soon as we grab it again, it is no longer valid.
         $_SESSION['cas']['lt_valid'] = FALSE;
         $_SESSION['cas']['lt_validated'] = $_SESSION['cas']['lt'];
         if (CAS_SERVER_DEBUG) {
             error_log('Login ticket '.$_SESSION['cas']['lt'].' validated');
         }
-    } else {
+    } else if (isset($form_state['cas_server_lt'])) {
 
-        // TODO sometimes (often, in fact), this is logging an empty incoming ticket, which it shouldn't be.
         if (CAS_SERVER_DEBUG) {
             $message = 'Current login ticket not found in session, so incoming ticket '.
                        $form_state['cas_server_lt'].' cannot be validated against it';
@@ -289,13 +291,14 @@ function cas_server_user_login_submit($form, &$form_state) {
 /**
  * Implementation of hook_user that fires when an external system asks for a login.
  *
- * @global <type> $user
  * @param string $service
- * @param bool $warn Should the user be warned about this being a new service they are getting authenticated to?
- * @param bool $renew
- * @param bool $gateway If true, the user will be redirected back where they came from if there's no ticket.
- * @param bool $renewal
- * @return <type>
+ * @param bool   $warn Should the user be warned about this being a new service they are getting authenticated to?
+ * @param bool   $renew
+ * @param bool   $gateway If true, the user will be redirected back where they came from if there's no ticket.
+ * @param bool   $renewal
+ *
+ * @global <type> $user
+ * @return array|null|string <type>
  */
 function cas_server_login_request($service, $warn=false, $renew=false, $gateway = NULL, $renewal = FALSE) {
     global $user;
