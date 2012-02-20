@@ -84,13 +84,13 @@ function cas_server_logout_page() {
 function cas_server_validate_page($v, $proxy_check = FALSE, $ticket=false) {
 
     $service = urldecode($_GET['service']);
-    if (!$service) {
+    if (empty($service)) {
         // saml special case
         $service = urldecode($_GET['TARGET']);
     }
-
-    $service = cas_server_validate_url($service);
-
+    if (!empty($service)) {
+        $service = cas_server_validate_url($service);
+    }
     $renew = $_GET['renew'];
     $renew = $renew ? true : false;
     $sticket = (empty($ticket)) ? $_GET['ticket'] : $ticket;

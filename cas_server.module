@@ -151,14 +151,10 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
                 '#value' => $service,
         );
 
-        // Not needed if we want to make it look like we have one unified site
-//        $message = 'This login request came from @service. By entering your credentials below, you '.
-//                   'will be authenticated and redirected to this site.';
-
-        //drupal_set_message(t($message, array('@service' => $service)));
     }
 
-    // Find the current login ticket. Always fails for uid = 0
+    // Find the current login ticket. Always fails for uid = 0. This is to make sure we are
+    // getting back the same form we sent
     if (isset($_SESSION['cas']) &&
         isset($_SESSION['cas']['lt']) &&
         isset($_SESSION['cas']['lt_valid']) && $_SESSION['cas']['lt_valid']) {
@@ -389,14 +385,18 @@ function cas_server_login_request($service, $warn=false, $renew=false, $gateway 
 
 /**
  * Function to create a ticket for a new service request that is coming in.
- * $uid - The uid of the user to create the ticket for. Should be the logged in user.
- * $service - The url of the $_GET['service'] variable
- * $tgc - The value of the ticket granting cookie that this request is being made with.
- * $renewal - Whether or not this is a renewal request
+ *
+ * @param int $uid The uid of the user to create the ticket for. Should be the logged in user.
+ * @param string $service The url of the $_GET['service'] variable
+ * @param string $tgc The value of the ticket granting cookie that this request is being made with.
+ * @param bool $renewal Whether or not this is a renewal request
+ *
+ * @return array|bool|object
  */
 function cas_server_new_service_ticket($uid, $service, $tgc, $renewal = FALSE) {
     $ticket = array(
-            'uid' => $uid, 'tgc' => $tgc,
+            'uid' => $uid,
+            'tgc' => $tgc,
             'service_url' => $service,
             'service_ticket' => _cas_server_generate_ticket('ST'),
             'renewal_ticket' => $renewal,
@@ -411,8 +411,10 @@ function cas_server_new_service_ticket($uid, $service, $tgc, $renewal = FALSE) {
 
 /**
  * Function to create a new proxy ticket
- * $pgt - A proxy granting ticket as returned from cas_server_load_proxy_granting_ticket()
- * $service - The service identifier of the back-end service
+ *
+ * @param string $pgt - A proxy granting ticket as returned from cas_server_load_proxy_granting_ticket()
+ * @param string $service - The service identifier of the back-end service
+ * @return array|bool|object
  */
 function cas_server_new_proxy_ticket($pgt, $service) {
     $ticket = array(
@@ -432,10 +434,20 @@ function cas_server_new_proxy_ticket($pgt, $service) {
  * $service_ticket - The st ticket: ST-......
  *
  * Needs to get First and last name from CiviCRM. Specific to CiviCRM implementation for ULCC
+ *
+ * @param $service_ticket
+ *
+ * @return \An|bool|object|\stdClass|void
  */
 function cas_server_load_service_ticket($service_ticket) {
 
-    $ticket = db_fetch_object(db_query('SELECT css.*, u.uid, u.name, u.mail FROM {cas_server_service} css JOIN {users} u ON css.uid = u.uid WHERE service_ticket = "%s" AND current_valid_ticket = 1', $service_ticket));
+    $sql = 'SELECT css.*, u.uid, u.name, u.mail
+              FROM {cas_server_service} css
+              JOIN {users} u
+                ON css.uid = u.uid
+             WHERE service_ticket = "%s"
+               AND current_valid_ticket = 1';
+    $ticket = db_fetch_object(db_query($sql, $service_ticket));
 
     if ($ticket) {
 
@@ -447,7 +459,8 @@ function cas_server_load_service_ticket($service_ticket) {
                 return $ticket;
             }
 
-            // TODO will this work if civicrm is in another location e.g. specific site folder, not all sites?
+            // TODO will this work if civicrm is in another location e.g. specific site folder,
+            // not all sites?
             require_once('CRM/Core/BAO/UFMatch.php');
 
             $civicrmcontactid = CRM_Core_BAO_UFMatch::getContactId( $ticket->uid );
@@ -715,8 +728,11 @@ function cas_server_single_sign_off() {
                           WHERE c.uid = %d', $user->uid);
 
     $ticketstoexpire = array();
+    $ticketcount = 0;
 
     while ($ticket = db_fetch_object($tickets)) {
+
+        $ticketcount++;
 
         if (CAS_SERVER_DEBUG) {
             error_log('Found service ticket '.$ticket->service_ticket.' for '.$user->name);
@@ -762,6 +778,12 @@ function cas_server_single_sign_off() {
         db_query($sql, $ticketid);
         if (CAS_SERVER_DEBUG) {
             error_log('Service ticket deleted: '.$ticketid);
+        }
+    }
+
+    if (!$ticketcount) {
+        if (CAS_SERVER_DEBUG) {
+            error_log('No service tickets found for '.$user->name.', uid: '.$user->uid);
         }
     }
 }
