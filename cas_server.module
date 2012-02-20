@@ -691,8 +691,12 @@ function cas_server_user($op, &$edit, &$account, $category = NULL) {
  * @return void
  */
 function cas_server_single_sign_off() {
-
     global $user;
+
+    if (CAS_SERVER_DEBUG) {
+        error_log('cas_server_single_sign_off() fired for '.$user->name);
+    }
+
     // Need to invalidate all service tickets
 
     // get most recent active service ticket for each service for this user
