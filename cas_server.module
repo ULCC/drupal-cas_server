@@ -109,6 +109,14 @@ function cas_server_exit() {
  */
 function cas_server_form_user_login_block_alter(&$form, &$form_state) {
 
+    // There seems to be a problem caused by the user login block being rebuilt (and invalidating the current expected
+    // login ticket) before that validation function has taken the POST data and checked that the incoming login ticket
+    // is the right one. The fix is to ignore the rebuild of the user login block if there is post data from the form.
+    // It'll get rebuilt on the redirect anyway, so this should be fine.
+    if (isset($_POST['cas_server_lt'])) {
+        return;
+    }
+
     // Don't show two forms on one page if we are being redirected to the login page
     if (strpos($form['#action'], 'cas_server/login')) {
         $form = array();
@@ -154,7 +162,7 @@ function cas_server_form_user_login_alter(&$form, &$form_state) {
 //        drupal_set_message(t($message, array('@service' => $service)));
     }
 
-    //Find the current login ticket
+    //Find the current login ticket and invalidate it.
     if (isset($_SESSION['cas']) && isset($_SESSION['cas']['lt']) && isset($_SESSION['cas']['lt_valid']) && $_SESSION['cas']['lt_valid']) {
         //As soon as we grab it again, it is no longer valid.
         $_SESSION['cas']['lt_valid'] = FALSE;
@@ -208,10 +216,10 @@ function cas_server_user_login_validate($form, &$form_state) {
     
     //This should never happen, but we need to check for it.
     if (!isset($_SESSION['cas']['lt_validated']) || !$_SESSION['cas']['lt_validated'] || !$loginticket) {
-        form_set_error('other', '');
+        form_set_error('other', 'Weird thing happened in the CAS module. Talk to a developer.');
     }
-    //Use _POST here because drupal form handling replaces hidden values with the form value before submission.
-    //We really want to check to make sure the value wasn't tampered with.
+    // Use _POST here because drupal form handling replaces hidden values with the form value before submission.
+    // We really want to check to make sure the value wasn't tampered with.
     else if ($loginticket != $_SESSION['cas']['lt_validated']) {
         //Someone changed the login ticket in the form. This is some form of an attack.
         $message = 'LOGIN invalid with non-matching login ticket. The given lt was @given but should have been @current.';
